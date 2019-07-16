@@ -173,56 +173,126 @@ def tempDS_update(temp_objects, new_objects):
 	return temp_objects
 
 
+def fresh_object(current_objects, obj_class, obj, count):
 
-
-def currentDS_update(current_objects, object_correspondence):
-	return
-
-
-
-# def semantic_update(current_objects, temp_objects, new_objects):
-
-
-# 	if temp_objects[3]:
-# 		for obj_class in temp_objects[3]:
-# 			if obj_class not in temp_objects[2] and obj_class not in temp_objects[1]:
-# 				temp_objects['classes'].pop(obj_class)
-
-# 	# Update temp_objects
-# 	temp_objects[3] = temp_objects[2]
-# 	temp_objects[2] = temp_objects[1]
-
-
-# 	for obj in new_objects:
-		
-# 		object_class = new_objects[obj].pop('class')
-
-# 		if object_class not in temp_objects[1]:
-			
-# 			d = {'count': 1, 1: new_objects[obj]}
-
-
-# 			temp_objects[1][object_class] = deep_d
+	num = -1
+	if obj_class not in current_objects['class_counts']:
+		num = 1
+		current_objects['class_counts'].update({obj_class: num})
+		current_objects['active_objects'].update({obj_class: {}})
+		current_objects['active_classes'].append(obj_class)
 	
+	else:
+		num = current_objects['class_counts'][obj_class] + 1
+		current_objects['class_counts'][obj_class] = num
 		
-# 		else:
-# 			temp_objects[1][object_class]['count'] = temp_objects[1][object_class]['count'] + 1
-# 			index = temp_objects[1][object_class]['count']
-# 			temp_objects[1][object_class][index] = new_objects[obj]
+	name = 'obj-' + str(obj_class) + '-' + str(num)
+	current_objects['active'].append(name)
 
-# 		if object_class not in temp_objects['classes']:
-# 				temp_objects['classes'].append(object_class)
+	d = {'P-Score': obj['P-Score'], 
+		'box': obj['box'],
+		'first_detected': count, 
+		'last_detected': count,
+		'filter':{
+			'mean': 'x', 
+			'covariance': 'P'
+		}
+	}
+	# print(d)
+	# print('')
+	current_objects['active_objects'][obj_class].update({name: d})
 
 
-# 	print('')
-# 	print('')
+	return current_objects
 
+
+
+def relative_difference(contenders, obj):
 	
-# 	print(temp_objects[3])
-# 	print(temp_objects[2])
-# 	print(temp_objects[1])
-# 	print('')
+	d = {}
+	for name in contenders:
+		diffs = {}
+		box = contenders[name]['box']
+		if obj['box']['xmin'] == 0:
+			diffs['xmin'] = 'na'
+		if obj['box']['xmin'] != 0:
+			diffs['xmin'] = ((box['xmin'] - obj['box']['xmin']) / obj['box']['xmin']) * 100
+		
+		diffs['xmax'] = ((box['xmax'] - obj['box']['xmax']) / obj['box']['xmax']) * 100
+
+		if obj['box']['ymin'] == 0:
+			diffs['ymin'] = 'na'
+		if obj['box']['ymin'] != 0:
+			diffs['ymin'] = ((box['ymin'] - obj['box']['ymin']) / obj['box']['ymin']) * 100
+
+		diffs['ymax'] = ((box['ymax'] - obj['box']['ymax']) / obj['box']['ymax']) * 100
+		
+		d[name] = diffs
+	return d
 
 
-# 	return
+
+def similarity_check(contender_diffs):
+
+	d = {}
+	for name in contender_diffs:
+		if 0 < contender_diffs[name]['xmin'] < 10 and 0 < contender_diffs[name]['xmax'] < 10:
+			d[name] = contender_diffs[name]
+		elif -10 < contender_diffs[name]['xmin'] < 0 and -10 < contender_diffs[name]['xmax'] < 0:
+			d[name] = contender_diffs[name]
+		elif 0 < contender_diffs[name]['ymin'] < 10 and 0 < contender_diffs[name]['ymax'] < 10:
+			d[name] = contender_diffs[name]
+		elif -10 < contender_diffs[name]['ymin'] < 0 and -10 < contender_diffs[name]['ymax'] < 0:
+			d[name] = contender_diffs[name]
+
+
+	return d
+
+
+
+def update_parent(current_objects, candidates, obj):
+
+	if len(list(candidates)) == 1:
+		return
+
+	else:
+		return
+
+
+
+
+def currentDS_update(current_objects, temp_objects, count):
+
+	new_objects = temp_objects[1]
+	classes = list(new_objects)
+
+	for obj_class in classes:
+		num = new_objects[obj_class]['count'] + 1
+		for k in range(1, num):
+			obj = new_objects[obj_class][k]
+			if obj_class not in current_objects['active_classes']:
+				current_objects = fresh_object(current_objects, obj_class, obj, count)
+			else: 
+				
+
+
+				contenders = current_objects['active_objects'][obj_class]
+				contender_diffs = relative_difference(contenders, obj)
+				candidates = similarity_check(contender_diffs)
+
+				if not candidates:
+					current_objects = fresh_object(current_objects, obj_class, obj, count)
+
+				else:
+					# current_objects = update_parent(current_objects, obj_class, obj, count)
+					continue
+
+
+
+
+				
+
+	return current_objects
+
+
 

@@ -78,6 +78,13 @@ if __name__ =='__main__':
 	end = 12331
 	count = 1371
 
+	temp_objects = {
+		'window': 3,
+		'classes': [],
+		1: {},
+		2: {},
+		3: {}
+	}
 
 	current_objects = {
 		'class_counts': {},
@@ -89,20 +96,15 @@ if __name__ =='__main__':
 		'inactive_objects': {}
 	}
 
-	temp_objects = {
-		'window': 3,
-		'classes': [],
-		1: {},
-		2: {},
-		3: {}
-	}
+	past_objects = {}
+	
 
 	while still_video(count, end):  # The generalization depends on method of video processing
 		print(count)
 		image_path = frame_input(count)  # Dummy function specific to testing instance 
 		data = structured_output(MODEL_NAME, FROZEN_GRAPH, LABELS, image_path)
-		# print(data)
-		count = count + 1
+
+		
 		if data == 'none':
 			continue
 
@@ -125,16 +127,21 @@ if __name__ =='__main__':
 				data[object_class][object_key]['class'] = object_class
 				new_objects[name] = data[object_class][object_key]
 
-			else:
-				correspondence[object_key] = poss_parents
+			# else:
+			# 	correspondence[object_key] = poss_parents
 
 		print(new_objects)
-
 		temp_objects = tempDS_update(temp_objects, new_objects)
-		for key in temp_objects:
-			print(key)
-			print(temp_objects[key])
 		print('')
+		print(temp_objects)
+		print('')
+		current_objects = currentDS_update(current_objects, temp_objects, count)
+		print(current_objects)
+		print('')
+
+		count = count + 1
+
+
 		# current_objects = currentDS_update(current_objects, correspondence)
 
 		# print('')
@@ -154,25 +161,11 @@ if __name__ =='__main__':
 		# 	parent_probabilities[obj] = dd
 
 
-		# print(temp_objects)
 		# semantic_update(current_objects, temp_objects, new_objects)
 
-		# print(temp_objects[1])
-		# print('')
-		# print(temp_objects[2])
-		# print('')
-		# print(temp_objects[3])
-		# print('')
-
-		# print('')
-		# print('')
 
 
-	# 	# needs modified for n-step pruning
-	# 	real_parents = establish_correspondence(parent_probabilities)
-	# 	semantic_update(curr_objs, temp_objs, real_parents, new_objs_dict)
 
-	# 	count = count + 1
 
 
 
