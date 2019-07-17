@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 
 def user_input():
 
@@ -212,22 +213,31 @@ def relative_difference(contenders, obj):
 	d = {}
 	for name in contenders:
 		diffs = {}
-		box = contenders[name]['box']
-		if obj['box']['xmin'] == 0:
-			diffs['xmin'] = 'na'
-		if obj['box']['xmin'] != 0:
-			diffs['xmin'] = ((box['xmin'] - obj['box']['xmin']) / obj['box']['xmin']) * 100
 		
-		diffs['xmax'] = ((box['xmax'] - obj['box']['xmax']) / obj['box']['xmax']) * 100
+		if contenders[name]['filter']['mean'] == 'x':
 
-		if obj['box']['ymin'] == 0:
-			diffs['ymin'] = 'na'
-		if obj['box']['ymin'] != 0:
-			diffs['ymin'] = ((box['ymin'] - obj['box']['ymin']) / obj['box']['ymin']) * 100
+			box = contenders[name]['box']
+			if obj['box']['xmin'] == 0:
+				diffs['xmin'] = 'na'
+			if obj['box']['xmin'] != 0:
+				diffs['xmin'] = ((box['xmin'] - obj['box']['xmin']) / obj['box']['xmin']) * 100
+			
+			diffs['xmax'] = ((box['xmax'] - obj['box']['xmax']) / obj['box']['xmax']) * 100
 
-		diffs['ymax'] = ((box['ymax'] - obj['box']['ymax']) / obj['box']['ymax']) * 100
-		
-		d[name] = diffs
+			if obj['box']['ymin'] == 0:
+				diffs['ymin'] = -'na'
+			if obj['box']['ymin'] != 0:
+				diffs['ymin'] = ((box['ymin'] - obj['box']['ymin']) / obj['box']['ymin']) * 100
+
+			diffs['ymax'] = ((box['ymax'] - obj['box']['ymax']) / obj['box']['ymax']) * 100
+			
+			d[name] = diffs
+
+		else:
+			continue
+
+
+
 	return d
 
 
@@ -236,6 +246,16 @@ def similarity_check(contender_diffs):
 
 	d = {}
 	for name in contender_diffs:
+
+		if contender_diffs[name]['xmin'] == 'na':
+			# if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
+			# 	d[name] = contender_diffs[name]
+				continue
+		if contender_diffs[name]['ymin'] == 'na':
+			# if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
+			# 	d[name] = contender_diffs[name] 
+				continue
+
 		if 0 < contender_diffs[name]['xmin'] < 10 and 0 < contender_diffs[name]['xmax'] < 10:
 			d[name] = contender_diffs[name]
 		elif -10 < contender_diffs[name]['xmin'] < 0 and -10 < contender_diffs[name]['xmax'] < 0:
@@ -250,13 +270,116 @@ def similarity_check(contender_diffs):
 
 
 
-def update_parent(current_objects, candidates, obj):
+def linear_filter(info):
+	return
 
-	if len(list(candidates)) == 1:
-		return
+
+
+
+
+def update_parent(current_objects, candidates, obj_class, obj, count):
+
+	print('GOT HERE BITCH')
+	print('')
+
+	names = list(candidates)
+	if len(names) == 1:
+		
+
+		info = current_objects['active_objects'][obj_class][names[0]]
+		diffs = {}
+		for key in obj['box']:
+
+			diffs[key] = info['box'][key] - obj['box'][key]
+		
+
+		tf_output = np.array([obj['box']['xmin'], obj['box']['xmax'], obj['box']['ymin'], obj['box']['ymax']])
+		print('tf_output')
+		print(tf_output)
+		print('')
+		state = np.array([info['box']['xmin'], info['box']['xmax'], info['box']['ymin'], info['box']['ymax'],
+						diffs['xmin'], diffs['xmax'], diffs['ymin'], diffs['ymax']])
+		print('state')
+		print(state)
+		print('')
+		covariance = np.array([[.1, .05, .025, .0125, 0, 0, 0, 0],
+								[.05, .1, .0125, .025, 0, 0, 0, 0],
+								[.025, .0125, .1, .05, 0, 0, 0, 0],
+								[.0125, .025, .05, .1, 0, 0, 0, 0],
+								[0, 0, 0, 0, .2, .1, 0, 0],
+								[0, 0, 0, 0, .1, .2, 0, 0],
+								[0, 0, 0, 0, 0, 0, .2, .1],
+								[0, 0, 0, 0, 0, 0, .1, .2]])
+		print('covariance')
+		print(covariance)
+		print('')
+		transition = np.array([[1, 0, 0, 0, 1, 0, 0, 0], 
+								[0, 1, 0, 0, 0, 1, 0, 0],
+								[0, 0, 1, 0, 0, 0, 1, 0],
+								[0, 0, 0, 1, 0, 0, 0, 1],
+								[0, 0, 0, 0, 1, 0, 0, 0],
+								[0, 0, 0, 0, 0, 1, 0, 0],
+								[0, 0, 0, 0, 0, 0, 1, 0],
+								[0, 0, 0, 0, 0, 0, 0, 1]])
+		print('transition')
+		print(transition)
+		print('')
+		transition_noise = np.array([[.1, .05, 0, 0, 0, 0, 0, 0],
+									[.05, .1, 0, 0, 0, 0, 0, 0],
+									[0, 0, .1, .05, 0, 0, 0, 0],
+									[0, 0, .05, .1, 0, 0, 0, 0],
+									[0, 0, 0, 0, .1, .05, 0, 0],
+									[0, 0, 0, 0, .05, .1, 0, 0],
+									[0, 0, 0, 0, 0, 0, .1, .05],
+									[0, 0, 0, 0, 0, 0, .05, .1]])
+		print('transition_noise')
+		print(transition_noise)
+		print('')
+		measurement = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
+								[0, 1, 0, 0, 0, 0, 0, 0],
+								[0, 0, 1, 0, 0, 0, 0, 0],
+								[0, 0, 0, 1, 0, 0, 0, 0]])
+		print('measurement')
+		print(measurement)
+		print('')
+		measurement_noise = np.array([[.1, .05, .025, .0125],
+									[.05, .1, .0125, .025],
+									[.025, .0125, .1, .05],
+									[.0125, .025, .05, .1]])
+		print('measurement_noise')
+		print(measurement_noise)
+		print('')
+
+
+		prior_mean = transition.dot(np.transpose(state))
+		print('prior_mean')
+		print(prior_mean)
+		print('')
+
+		prior_covariance = np.add((transition.dot(covariance)).dot(np.transpose(transition)), transition_noise)
+		residual = np.subtract(np.transpose(tf_output), measurement.dot(prior_mean))
+		uncertainty = np.add((measurement.dot(prior_covariance)).dot(np.transpose(measurement)), measurement_noise)
+		kalman_gain = (prior_covariance.dot(np.transpose(measurement))).dot(np.linalg.inv(uncertainty))
+		posterior_mean = np.add(prior_mean, kalman_gain.dot(residual))
+		posterior_covariance = (np.subtract(np.identity(8), kalman_gain.dot(measurement))).dot(prior_covariance)
+
+		print('posterior_mean')
+		print(posterior_mean)
+		print('')
+
+		info['P-Score'] = obj['P-Score']
+		info['box'] = obj['box']
+		info['last_detected'] = count
+		info['filter']['mean'] = posterior_mean
+		info['filter']['covariance'] = posterior_covariance
+		current_objects['active_objects'][obj_class][names[0]] = info
+
+		return current_objects
 
 	else:
-		return
+
+
+		return current_objects
 
 
 
@@ -274,18 +397,20 @@ def currentDS_update(current_objects, temp_objects, count):
 				current_objects = fresh_object(current_objects, obj_class, obj, count)
 			else: 
 				
-
-
 				contenders = current_objects['active_objects'][obj_class]
 				contender_diffs = relative_difference(contenders, obj)
 				candidates = similarity_check(contender_diffs)
+				# print('ZZZZZZZZZ')
+				# print(candidates)
+				# print(obj)
+				# print('')
 
 				if not candidates:
 					current_objects = fresh_object(current_objects, obj_class, obj, count)
 
 				else:
-					# current_objects = update_parent(current_objects, obj_class, obj, count)
-					continue
+					current_objects = update_parent(current_objects, candidates, obj_class, obj, count)
+					# continue
 
 
 

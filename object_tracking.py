@@ -2,7 +2,6 @@ from basic_detection import structured_output
 from helpers_ot import user_input, frame_input, still_video, trajectory_check
 from helpers_ot import likelihood, establish_correspondence, tempDS_update, currentDS_update
 
-
 # DATA SKELETON
 
 	# temp_objects = {'n-step': k,
@@ -76,7 +75,7 @@ if __name__ =='__main__':
 	last = 'Forward_10204_1844-f-0012331.jpg'
 	start = 1
 	end = 12331
-	count = 1371
+	count = 1373
 
 	temp_objects = {
 		'window': 3,
