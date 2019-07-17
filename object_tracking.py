@@ -1,6 +1,6 @@
 from basic_detection import structured_output
 from helpers_ot import user_input, frame_input, still_video, trajectory_check
-from helpers_ot import likelihood, establish_correspondence, tempDS_update, currentDS_update
+from helpers_ot import likelihood, establish_correspondence, tempDS_update, currentDS_update, pastDS_update
 
 # DATA SKELETON
 
@@ -90,12 +90,13 @@ if __name__ =='__main__':
 		'active': [],
 		'active_classes': [],
 		'active_objects': {},
+	}
+
+	past_objects = {
 		'inactive': [],
 		'inactive_classes': [],
 		'inactive_objects': {}
 	}
-
-	past_objects = {}
 	
 
 	while still_video(count, end):  # The generalization depends on method of video processing
@@ -135,7 +136,12 @@ if __name__ =='__main__':
 		print(temp_objects)
 		print('')
 		current_objects = currentDS_update(current_objects, temp_objects, count)
+		data = pastDS_update(current_objects, past_objects, count)
+		current_objects = data[0]
+		past_objects = data[1]
 		print(current_objects)
+		print('')
+		# print(past_objects)
 		print('')
 
 		count = count + 1

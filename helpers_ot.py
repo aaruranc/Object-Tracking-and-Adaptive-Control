@@ -1,6 +1,8 @@
 import copy
 import numpy as np
 
+
+
 def user_input():
 
 	directory = input("What is the video directory? ")
@@ -36,40 +38,6 @@ def frame_input(count):
 	return file
 
 
-
-	# current_objects = {'active': ['obj-1.0-135', 'obj-1.0-136', ..., 'obj-120.0-5'],
-	# 					'class_counts': {
-	# 						1.0: 3,
-	# 						2.0: 1,
-	# 						...
-	# 						120.0: 7
-	# 					},
-	# 					'active_classes': [1.0, 3.0, ..., 120.0],
-	# 					'active_objects': {
-	# 						'obj-1.0-135': {...},
-	# 						...
-	# 						'obj-120.0-5': {...}
-	# 					},
-	# 					'inactive_classes': [1.0, 2.0, ..., 130.0],
-	# 					'inactive': ['obj-1.0-1', 'obj-1.0-2', ..., 'obj-130.0-3'],
-	# 					'inactive_objects': {
-	# 						'obj-1.0-1': {...},
-	# 						...
-	# 						'obj-130.0-3': {...}
-	# 					}						
-	# }
-
-
-	# obj-4.0-135 = {'P-Score': 1, 'first_detected': 75, 'last_detected': 123, 
-	# 		'curr_box': 
-	# 			{'xmin': 0, 'ymin': 0.3, 'xmax': 0.5, 'ymax': 0.8},
-	# 		'trajectory': 
-	# 			{'distribution': {},
-	# 			 'history': {}
-	# 			 }
-	# 	}
-
-	# obj: {'P-Score': obj_score, 'box': {'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax}}
 
 
 
@@ -199,8 +167,7 @@ def fresh_object(current_objects, obj_class, obj, count):
 			'covariance': 'P'
 		}
 	}
-	# print(d)
-	# print('')
+
 	current_objects['active_objects'][obj_class].update({name: d})
 
 
@@ -212,11 +179,11 @@ def relative_difference(contenders, obj):
 	
 	d = {}
 	for name in contenders:
-		diffs = {}
 		
+		diffs = {}
+		box = contenders[name]['box']
 		if contenders[name]['filter']['mean'] == 'x':
 
-			box = contenders[name]['box']
 			if obj['box']['xmin'] == 0:
 				diffs['xmin'] = 'na'
 			if obj['box']['xmin'] != 0:
@@ -230,11 +197,27 @@ def relative_difference(contenders, obj):
 				diffs['ymin'] = ((box['ymin'] - obj['box']['ymin']) / obj['box']['ymin']) * 100
 
 			diffs['ymax'] = ((box['ymax'] - obj['box']['ymax']) / obj['box']['ymax']) * 100
-			
-			d[name] = diffs
 
 		else:
-			continue
+			
+			filter_state = contenders[name]['filter']['mean'][0:5]
+
+			if filter_state[0] == 0:
+				diffs['xmin'] = 'na'
+			if filter_state[0] != 0:
+				diffs['xmin'] = ((box['xmin'] - filter_state[0]) / filter_state[0]) * 100
+
+			diffs['xmax'] = ((box['xmax'] - filter_state[1]) / filter_state[1]) * 100
+
+			if filter_state[2] == 0:
+				diffs['ymin'] = 'na'
+			if filter_state[2] != 0:
+				diffs['ymin'] = ((box['ymin'] - filter_state[2]) / filter_state[2]) * 100
+
+			diffs['ymax'] = ((box['ymax'] - filter_state[3]) / filter_state[3]) * 100
+
+
+		d[name] = diffs
 
 
 
@@ -248,12 +231,12 @@ def similarity_check(contender_diffs):
 	for name in contender_diffs:
 
 		if contender_diffs[name]['xmin'] == 'na':
-			# if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
-			# 	d[name] = contender_diffs[name]
+			if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
+				d[name] = contender_diffs[name]
 				continue
 		if contender_diffs[name]['ymin'] == 'na':
-			# if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
-			# 	d[name] = contender_diffs[name] 
+			if 0 < contender_diffs[name]['xmax'] < 10 or -10 < contender_diffs[name]['xmax'] < 0:
+				d[name] = contender_diffs[name] 
 				continue
 
 		if 0 < contender_diffs[name]['xmin'] < 10 and 0 < contender_diffs[name]['xmax'] < 10:
@@ -270,117 +253,146 @@ def similarity_check(contender_diffs):
 
 
 
-def linear_filter(info):
-	return
+
+def most_similar(current_objects, candidates, obj_class, obj):
+
+	score = {}
+	for name in candidates:
+		box = current_objects['active_objects'][obj_class][name]['box']
+		difference = ((box['xmin'] - obj['box']['xmin']) ** 2) + ((box['xmax'] - obj['box']['xmax']) ** 2) 
+		+ ((box['ymin'] - obj['box']['ymin']) ** 2) + ((box['ymax'] - obj['box']['ymax']) ** 2)
+		score[name] = difference
+
+	min_name = ''
+	minimum = 10000
+	for name in score:
+		if score[name] < minimum:
+			min_name = name
+			minimum = score[name]
+
+	return min_name
 
 
+
+def bayesian_updating(state, covariance, tf_output=''):
+	
+
+	transition = np.array([[1, 0, 0, 0, 1, 0, 0, 0], 
+							[0, 1, 0, 0, 0, 1, 0, 0],
+							[0, 0, 1, 0, 0, 0, 1, 0],
+							[0, 0, 0, 1, 0, 0, 0, 1],
+							[0, 0, 0, 0, 1, 0, 0, 0],
+							[0, 0, 0, 0, 0, 1, 0, 0],
+							[0, 0, 0, 0, 0, 0, 1, 0],
+							[0, 0, 0, 0, 0, 0, 0, 1]])
+	
+	transition_noise = np.array([[1, .5, 0, 0, 0, 0, 0, 0],
+									[.5, 1, 0, 0, 0, 0, 0, 0],
+									[0, 0, 1, .5, 0, 0, 0, 0],
+									[0, 0, .5, 1, 0, 0, 0, 0],
+									[0, 0, 0, 0, 1, .5, 0, 0],
+									[0, 0, 0, 0, .5, 1, 0, 0],
+									[0, 0, 0, 0, 0, 0, 1, .5],
+									[0, 0, 0, 0, 0, 0, .5, 1]])
+
+	prior_mean = transition.dot(np.transpose(state))
+	prior_covariance = np.add((transition.dot(covariance)).dot(np.transpose(transition)), transition_noise)
+
+	if tf_output == '':
+		x = (prior_mean, prior_covariance)
+	else:
+	
+		measurement = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
+								[0, 1, 0, 0, 0, 0, 0, 0],
+								[0, 0, 1, 0, 0, 0, 0, 0],
+								[0, 0, 0, 1, 0, 0, 0, 0]])
+
+		measurement_noise = np.array([[1, .5, .25, .125],
+									[.5, 1, .125, .25],
+									[.25, .125, 1, .5],
+									[.125, .25, .5, 1]])
+
+		residual = np.subtract(np.transpose(tf_output), measurement.dot(prior_mean))
+		uncertainty = np.add((measurement.dot(prior_covariance)).dot(np.transpose(measurement)), measurement_noise)
+		kalman_gain = (prior_covariance.dot(np.transpose(measurement))).dot(np.linalg.inv(uncertainty))
+		
+		posterior_mean = np.add(prior_mean, kalman_gain.dot(residual))
+		posterior_covariance = (np.subtract(np.identity(8), kalman_gain.dot(measurement))).dot(prior_covariance)
+		x = (posterior_mean, posterior_covariance)
+	
+
+	return x
+
+
+
+def linear_filter(current_objects, parent, obj_class, obj, count):
+	
+	info = current_objects['active_objects'][obj_class][parent]
+	tf_output = np.array([obj['box']['xmin'], obj['box']['xmax'], obj['box']['ymin'], obj['box']['ymax']])
+	state = ''
+	covariance = ''
+
+	if info['filter']['mean'] == 'x':
+
+		speed = {}
+		for key in obj['box']:
+			speed[key] =  obj['box'][key] - info['box'][key]
+		
+		state = np.array([info['box']['xmin'], info['box']['xmax'], info['box']['ymin'], info['box']['ymax'],
+						speed['xmin'], speed['xmax'], speed['ymin'], speed['ymax']])
+		covariance = np.array([[1, .5, .25, .125, 0, 0, 0, 0],
+								[.5, 1, .125, .25, 0, 0, 0, 0],
+								[.25, .125, 1, .5, 0, 0, 0, 0],
+								[.125, .25, .5, 1, 0, 0, 0, 0],
+								[0, 0, 0, 0, 2, 1, 0, 0],
+								[0, 0, 0, 0, 1, 2, 0, 0],
+								[0, 0, 0, 0, 0, 0, 2, 1],
+								[0, 0, 0, 0, 0, 0, 1, 2]])
+
+
+	else:
+
+		state = info['filter']['mean']
+		covariance = info['filter']['covariance']
+
+	updated_info = bayesian_updating(state, covariance, tf_output)	
+	info['P-Score'] = obj['P-Score']
+	info['box'] = obj['box']
+	info['last_detected'] = count
+	info['filter']['mean'] = updated_info[0]
+	info['filter']['covariance'] = updated_info[1]
+	current_objects['active_objects'][obj_class][parent] = info
+
+	return current_objects
 
 
 
 def update_parent(current_objects, candidates, obj_class, obj, count):
 
-	print('GOT HERE BITCH')
-	print('')
-
 	names = list(candidates)
+	parent = ''
 	if len(names) == 1:
-		
-
-		info = current_objects['active_objects'][obj_class][names[0]]
-		diffs = {}
-		for key in obj['box']:
-
-			diffs[key] = info['box'][key] - obj['box'][key]
-		
-
-		tf_output = np.array([obj['box']['xmin'], obj['box']['xmax'], obj['box']['ymin'], obj['box']['ymax']])
-		print('tf_output')
-		print(tf_output)
-		print('')
-		state = np.array([info['box']['xmin'], info['box']['xmax'], info['box']['ymin'], info['box']['ymax'],
-						diffs['xmin'], diffs['xmax'], diffs['ymin'], diffs['ymax']])
-		print('state')
-		print(state)
-		print('')
-		covariance = np.array([[.1, .05, .025, .0125, 0, 0, 0, 0],
-								[.05, .1, .0125, .025, 0, 0, 0, 0],
-								[.025, .0125, .1, .05, 0, 0, 0, 0],
-								[.0125, .025, .05, .1, 0, 0, 0, 0],
-								[0, 0, 0, 0, .2, .1, 0, 0],
-								[0, 0, 0, 0, .1, .2, 0, 0],
-								[0, 0, 0, 0, 0, 0, .2, .1],
-								[0, 0, 0, 0, 0, 0, .1, .2]])
-		print('covariance')
-		print(covariance)
-		print('')
-		transition = np.array([[1, 0, 0, 0, 1, 0, 0, 0], 
-								[0, 1, 0, 0, 0, 1, 0, 0],
-								[0, 0, 1, 0, 0, 0, 1, 0],
-								[0, 0, 0, 1, 0, 0, 0, 1],
-								[0, 0, 0, 0, 1, 0, 0, 0],
-								[0, 0, 0, 0, 0, 1, 0, 0],
-								[0, 0, 0, 0, 0, 0, 1, 0],
-								[0, 0, 0, 0, 0, 0, 0, 1]])
-		print('transition')
-		print(transition)
-		print('')
-		transition_noise = np.array([[.1, .05, 0, 0, 0, 0, 0, 0],
-									[.05, .1, 0, 0, 0, 0, 0, 0],
-									[0, 0, .1, .05, 0, 0, 0, 0],
-									[0, 0, .05, .1, 0, 0, 0, 0],
-									[0, 0, 0, 0, .1, .05, 0, 0],
-									[0, 0, 0, 0, .05, .1, 0, 0],
-									[0, 0, 0, 0, 0, 0, .1, .05],
-									[0, 0, 0, 0, 0, 0, .05, .1]])
-		print('transition_noise')
-		print(transition_noise)
-		print('')
-		measurement = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
-								[0, 1, 0, 0, 0, 0, 0, 0],
-								[0, 0, 1, 0, 0, 0, 0, 0],
-								[0, 0, 0, 1, 0, 0, 0, 0]])
-		print('measurement')
-		print(measurement)
-		print('')
-		measurement_noise = np.array([[.1, .05, .025, .0125],
-									[.05, .1, .0125, .025],
-									[.025, .0125, .1, .05],
-									[.0125, .025, .05, .1]])
-		print('measurement_noise')
-		print(measurement_noise)
-		print('')
-
-
-		prior_mean = transition.dot(np.transpose(state))
-		print('prior_mean')
-		print(prior_mean)
-		print('')
-
-		prior_covariance = np.add((transition.dot(covariance)).dot(np.transpose(transition)), transition_noise)
-		residual = np.subtract(np.transpose(tf_output), measurement.dot(prior_mean))
-		uncertainty = np.add((measurement.dot(prior_covariance)).dot(np.transpose(measurement)), measurement_noise)
-		kalman_gain = (prior_covariance.dot(np.transpose(measurement))).dot(np.linalg.inv(uncertainty))
-		posterior_mean = np.add(prior_mean, kalman_gain.dot(residual))
-		posterior_covariance = (np.subtract(np.identity(8), kalman_gain.dot(measurement))).dot(prior_covariance)
-
-		print('posterior_mean')
-		print(posterior_mean)
-		print('')
-
-		info['P-Score'] = obj['P-Score']
-		info['box'] = obj['box']
-		info['last_detected'] = count
-		info['filter']['mean'] = posterior_mean
-		info['filter']['covariance'] = posterior_covariance
-		current_objects['active_objects'][obj_class][names[0]] = info
-
-		return current_objects
-
+		parent = names[0]
 	else:
+		parent = most_similar(current_objects, candidates, obj_class, obj)
+
+	current_objects = linear_filter(current_objects, parent, obj_class, obj, count)
+	return current_objects
 
 
-		return current_objects
 
+def update_filter(current_objects, count):
+
+	for obj_class in current_objects['active_objects']:
+		for name in current_objects['active_objects'][obj_class]:
+			info = current_objects['active_objects'][obj_class][name]
+
+			if info['last_detected'] < count and info['filter']['mean'] != 'x':
+				updated_info = bayesian_updating(info['filter']['mean'], info['filter']['covariance'])
+				current_objects['active_objects'][obj_class][name]['filter']['mean'] = updated_info[0]
+				current_objects['active_objects'][obj_class][name]['filter']['covariance'] = updated_info[1]
+
+	return current_objects
 
 
 
@@ -400,24 +412,56 @@ def currentDS_update(current_objects, temp_objects, count):
 				contenders = current_objects['active_objects'][obj_class]
 				contender_diffs = relative_difference(contenders, obj)
 				candidates = similarity_check(contender_diffs)
-				# print('ZZZZZZZZZ')
-				# print(candidates)
-				# print(obj)
-				# print('')
 
 				if not candidates:
 					current_objects = fresh_object(current_objects, obj_class, obj, count)
 
 				else:
 					current_objects = update_parent(current_objects, candidates, obj_class, obj, count)
-					# continue
 
 
+	current_objects = update_filter(current_objects, count)
 
-
-				
 
 	return current_objects
 
+
+
+def pastDS_update(current_objects, past_objects, count):
+
+	decommission = []
+
+	for obj_class in current_objects['active_objects']:
+		for name in current_objects['active_objects'][obj_class]:
+			
+			last = current_objects['active_objects'][obj_class][name]['last_detected']
+			if last < (count - 5):
+				info = (obj_class, name)
+				decommission.append(info)
+
+
+	for entry in decommission:
+		
+		obj_class = entry[0]
+		name = entry[1]
+		d = (current_objects['active_objects'][obj_class]).pop(name)
+		dd = {name: d}
+
+		current_objects['active'].remove(name)
+		if obj_class not in current_objects['active_objects']:
+			current_objects['active_classes'].remove(obj_class)
+		past_objects['inactive'].append(name)
+		if obj_class not in past_objects['inactive_classes']:
+			past_objects['inactive_classes'].append(obj_class)
+
+		if not past_objects['inactive_objects']:
+			past_objects['inactive_objects'] = {obj_class: dd}
+		elif obj_class not in past_objects['inactive_objects']:
+			past_objects['inactive_objects'][obj_class] = dd
+		else:
+			past_objects['inactive_objects'][obj_class][name] = d
+
+	data = (current_objects, past_objects)
+	return data
 
 
