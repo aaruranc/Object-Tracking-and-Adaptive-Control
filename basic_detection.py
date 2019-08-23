@@ -214,7 +214,7 @@ def structured_output(MODEL_NAME, FROZEN_GRAPH, LABELS, image_path):
 	box_ctr = 0;
 	box_count = output_dict['num_detections']
 	if box_count == 0:
-	  	return 'none'
+	  	return {}
 	
 	curr_class = int(output_dict['detection_classes'][box_ctr])
 	class_num = 0
